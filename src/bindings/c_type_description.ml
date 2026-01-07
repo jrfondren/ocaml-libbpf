@@ -3,6 +3,26 @@ open Ctypes
 (** You probably don't mean to be looking into this section, it is
     part of the stub generation process of the bindings.*)
 
+let kver =
+  let default = (6, 1, 0) in
+  let p = Unix.open_process_in "uname -r" in
+  let v = In_channel.input_line p in
+  let _ = Unix.close_process_in p in
+
+  match v with
+  | Some v ->
+      if
+        0
+        = Str.search_forward
+            (Str.regexp {|^\([0-9]+\)[.]\([0-9]+\)[.]\([0-9]+\)|})
+            v 0
+      then
+        ( int_of_string (Str.matched_group 1 v),
+          int_of_string (Str.matched_group 2 v),
+          int_of_string (Str.matched_group 3 v) )
+      else default
+  | None -> default
+
 module Types (F : Ctypes.TYPE) = struct
   open F
 
@@ -120,54 +140,59 @@ module Types (F : Ctypes.TYPE) = struct
       let sk = c ~prefix:"BPF_SK_" in
       let trace = c ~prefix:"BPF_TRACE_" in
       let xdp = c ~prefix:"BPF_XDP_" in
+      let none = c ~prefix:"" in
       enum "bpf_attach_type"
         ~unexpected:(fun _ -> `UNKNOWN)
-        [
-          (`BPF_CGROUP_INET_INGRESS, cgroup "INET_INGRESS");
-          (`BPF_CGROUP_INET_EGRESS, cgroup "INET_EGRESS");
-          (`BPF_CGROUP_INET_SOCK_CREATE, cgroup "INET_SOCK_CREATE");
-          (`BPF_CGROUP_SOCK_OPS, cgroup "SOCK_OPS");
-          (`BPF_CGROUP_DEVICE, cgroup "DEVICE");
-          (`BPF_CGROUP_INET4_BIND, cgroup "INET4_BIND");
-          (`BPF_CGROUP_INET6_BIND, cgroup "INET6_BIND");
-          (`BPF_CGROUP_INET4_CONNECT, cgroup "INET4_CONNECT");
-          (`BPF_CGROUP_INET6_CONNECT, cgroup "INET6_CONNECT");
-          (`BPF_CGROUP_INET4_POST_BIND, cgroup "INET4_POST_BIND");
-          (`BPF_CGROUP_INET6_POST_BIND, cgroup "INET6_POST_BIND");
-          (`BPF_CGROUP_UDP4_SENDMSG, cgroup "UDP4_SENDMSG");
-          (`BPF_CGROUP_UDP6_SENDMSG, cgroup "UDP6_SENDMSG");
-          (`BPF_CGROUP_SYSCTL, cgroup "SYSCTL");
-          (`BPF_CGROUP_UDP4_RECVMSG, cgroup "UDP4_RECVMSG");
-          (`BPF_CGROUP_UDP6_RECVMSG, cgroup "UDP6_RECVMSG");
-          (`BPF_CGROUP_GETSOCKOPT, cgroup "GETSOCKOPT");
-          (`BPF_CGROUP_SETSOCKOPT, cgroup "SETSOCKOPT");
-          (`BPF_CGROUP_INET4_GETPEERNAME, cgroup "INET4_GETPEERNAME");
-          (`BPF_CGROUP_INET6_GETPEERNAME, cgroup "INET6_GETPEERNAME");
-          (`BPF_CGROUP_INET4_GETSOCKNAME, cgroup "INET4_GETSOCKNAME");
-          (`BPF_CGROUP_INET6_GETSOCKNAME, cgroup "INET6_GETSOCKNAME");
-          (`BPF_CGROUP_INET_SOCK_RELEASE, cgroup "INET_SOCK_RELEASE");
-          (`BPF_SK_SKB_STREAM_PARSER, sk "SKB_STREAM_PARSER");
-          (`BPF_SK_SKB_STREAM_VERDICT, sk "SKB_STREAM_VERDICT");
-          (`BPF_SK_MSG_VERDICT, sk "MSG_VERDICT");
-          (`BPF_SK_LOOKUP, sk "LOOKUP");
-          (`BPF_SK_SKB_VERDICT, sk "SKB_VERDICT");
-          (`BPF_SK_REUSEPORT_SELECT, sk "REUSEPORT_SELECT");
-          (`BPF_SK_REUSEPORT_SELECT_OR_MIGRATE, sk "REUSEPORT_SELECT_OR_MIGRATE");
-          (`BPF_TRACE_RAW_TP, trace "RAW_TP");
-          (`BPF_TRACE_FENTRY, trace "FENTRY");
-          (`BPF_TRACE_FEXIT, trace "FEXIT");
-          (`BPF_TRACE_ITER, trace "ITER");
-          (`BPF_TRACE_KPROBE_MULTI, trace "KPROBE_MULTI");
-          (`BPF_XDP_DEVMAP, xdp "DEVMAP");
-          (`BPF_XDP_CPUMAP, xdp "CPUMAP");
-          (`BPF_XDP, c "BPF_XDP");
-          (`BPF_LIRC_MODE2, c "BPF_LIRC_MODE2");
-          (`BPF_FLOW_DISSECTOR, c "BPF_FLOW_DISSECTOR");
-          (`BPF_MODIFY_RETURN, c "BPF_MODIFY_RETURN");
-          (`BPF_PERF_EVENT, c "BPF_PERF_EVENT");
-          (`BPF_LSM_MAC, c "BPF_LSM_MAC");
-          (`BPF_LSM_CGROUP, c "BPF_LSM_CGROUP");
-        ]
+        (List.filter
+           (function
+             | `BPF_TRACE_KPROBE_MULTI, _, _ | `BPF_LSM_CGROUP, _, _ -> kver >= (6, 1, 0)
+             | _ -> true)
+           [
+             (`BPF_CGROUP_INET_INGRESS, cgroup, "INET_INGRESS");
+             (`BPF_CGROUP_INET_EGRESS, cgroup, "INET_EGRESS");
+             (`BPF_CGROUP_INET_SOCK_CREATE, cgroup, "INET_SOCK_CREATE");
+             (`BPF_CGROUP_SOCK_OPS, cgroup, "SOCK_OPS");
+             (`BPF_CGROUP_DEVICE, cgroup, "DEVICE");
+             (`BPF_CGROUP_INET4_BIND, cgroup, "INET4_BIND");
+             (`BPF_CGROUP_INET6_BIND, cgroup, "INET6_BIND");
+             (`BPF_CGROUP_INET4_CONNECT, cgroup, "INET4_CONNECT");
+             (`BPF_CGROUP_INET6_CONNECT, cgroup, "INET6_CONNECT");
+             (`BPF_CGROUP_INET4_POST_BIND, cgroup, "INET4_POST_BIND");
+             (`BPF_CGROUP_INET6_POST_BIND, cgroup, "INET6_POST_BIND");
+             (`BPF_CGROUP_UDP4_SENDMSG, cgroup, "UDP4_SENDMSG");
+             (`BPF_CGROUP_UDP6_SENDMSG, cgroup, "UDP6_SENDMSG");
+             (`BPF_CGROUP_SYSCTL, cgroup, "SYSCTL");
+             (`BPF_CGROUP_UDP4_RECVMSG, cgroup, "UDP4_RECVMSG");
+             (`BPF_CGROUP_UDP6_RECVMSG, cgroup, "UDP6_RECVMSG");
+             (`BPF_CGROUP_GETSOCKOPT, cgroup, "GETSOCKOPT");
+             (`BPF_CGROUP_SETSOCKOPT, cgroup, "SETSOCKOPT");
+             (`BPF_CGROUP_INET4_GETPEERNAME, cgroup, "INET4_GETPEERNAME");
+             (`BPF_CGROUP_INET6_GETPEERNAME, cgroup, "INET6_GETPEERNAME");
+             (`BPF_CGROUP_INET4_GETSOCKNAME, cgroup, "INET4_GETSOCKNAME");
+             (`BPF_CGROUP_INET6_GETSOCKNAME, cgroup, "INET6_GETSOCKNAME");
+             (`BPF_CGROUP_INET_SOCK_RELEASE, cgroup, "INET_SOCK_RELEASE");
+             (`BPF_SK_SKB_STREAM_PARSER, sk, "SKB_STREAM_PARSER");
+             (`BPF_SK_SKB_STREAM_VERDICT, sk, "SKB_STREAM_VERDICT");
+             (`BPF_SK_MSG_VERDICT, sk, "MSG_VERDICT");
+             (`BPF_SK_LOOKUP, sk, "LOOKUP");
+             (`BPF_SK_SKB_VERDICT, sk, "SKB_VERDICT");
+             (`BPF_SK_REUSEPORT_SELECT, sk, "REUSEPORT_SELECT");
+             (`BPF_SK_REUSEPORT_SELECT_OR_MIGRATE, sk, "REUSEPORT_SELECT_OR_MIGRATE");
+             (`BPF_TRACE_RAW_TP, trace, "RAW_TP");
+             (`BPF_TRACE_FENTRY, trace, "FENTRY");
+             (`BPF_TRACE_FEXIT, trace, "FEXIT");
+             (`BPF_TRACE_ITER, trace, "ITER");
+             (`BPF_TRACE_KPROBE_MULTI, trace, "KPROBE_MULTI");
+             (`BPF_XDP_DEVMAP, xdp, "DEVMAP");
+             (`BPF_XDP_CPUMAP, xdp, "CPUMAP");
+             (`BPF_XDP, none, "BPF_XDP");
+             (`BPF_LIRC_MODE2, none, "BPF_LIRC_MODE2");
+             (`BPF_FLOW_DISSECTOR, none, "BPF_FLOW_DISSECTOR");
+             (`BPF_MODIFY_RETURN, none, "BPF_MODIFY_RETURN");
+             (`BPF_PERF_EVENT, none, "BPF_PERF_EVENT");
+             (`BPF_LSM_MAC, none, "BPF_LSM_MAC");
+             (`BPF_LSM_CGROUP, none, "BPF_LSM_CGROUP");
+           ] |> List.map (fun (t, f, s) -> t, f s))
   end
 
   module Bpf_link_type = struct
@@ -188,18 +213,21 @@ module Types (F : Ctypes.TYPE) = struct
       let def = c ~prefix:"BPF_LINK_TYPE_" in
       enum "bpf_link_type"
         ~unexpected:(fun _ -> `UNKNOWN)
-        [
-          (`UNSPEC, def "UNSPEC");
-          (`RAW_TRACEPOINT, def "RAW_TRACEPOINT");
-          (`TRACING, def "TRACING");
-          (`CGROUP, def "CGROUP");
-          (`ITER, def "ITER");
-          (`NETNS, def "NETNS");
-          (`XDP, def "XDP");
-          (`PERF_EVENT, def "PERF_EVENT");
-          (`KPROBE_MULTI, def "KPROBE_MULTI");
-          (`STRUCT_OPS, def "STRUCT_OPS");
-        ]
+        (List.filter
+           (function
+             | `KPROBE_MULTI, _, _ | `STRUCT_OPS, _, _ -> kver >= (6, 1, 0) | _ -> true)
+           [
+             (`UNSPEC, def, "UNSPEC");
+             (`RAW_TRACEPOINT, def, "RAW_TRACEPOINT");
+             (`TRACING, def, "TRACING");
+             (`CGROUP, def, "CGROUP");
+             (`ITER, def, "ITER");
+             (`NETNS, def, "NETNS");
+             (`XDP, def, "XDP");
+             (`PERF_EVENT, def, "PERF_EVENT");
+             (`KPROBE_MULTI, def, "KPROBE_MULTI");
+             (`STRUCT_OPS, def, "STRUCT_OPS");
+           ] |> List.map (fun (t, f, s) -> t, f s))
   end
 
   module Bpf_map_type = struct
@@ -243,40 +271,42 @@ module Types (F : Ctypes.TYPE) = struct
     let t : t typ =
       enum "bpf_map_type"
         ~unexpected:(fun _ -> `UNKNOWN)
-        [
-          (`UNSPEC, def "UNSPEC");
-          (`HASH, def "HASH");
-          (`ARRAY, def "ARRAY");
-          (`PROG_ARRAY, def "PROG_ARRAY");
-          (`PERF_EVENT_ARRAY, def "PERF_EVENT_ARRAY");
-          (`PERCPU_HASH, def "PERCPU_HASH");
-          (`PERCPU_ARRAY, def "PERCPU_ARRAY");
-          (`STACK_TRACE, def "STACK_TRACE");
-          (`CGROUP_ARRAY, def "CGROUP_ARRAY");
-          (`LRU_HASH, def "LRU_HASH");
-          (`LRU_PERCPU_HASH, def "LRU_PERCPU_HASH");
-          (`LPM_TRIE, def "LPM_TRIE");
-          (`ARRAY_OF_MAPS, def "ARRAY_OF_MAPS");
-          (`HASH_OF_MAPS, def "HASH_OF_MAPS");
-          (`DEVMAP, def "DEVMAP");
-          (`SOCKMAP, def "SOCKMAP");
-          (`CPUMAP, def "CPUMAP");
-          (`XSKMAP, def "XSKMAP");
-          (`SOCKHASH, def "SOCKHASH");
-          (`CGROUP_STORAGE, def "CGROUP_STORAGE");
-          (`REUSEPORT_SOCKARRAY, def "REUSEPORT_SOCKARRAY");
-          (`PERCPU_CGROUP_STORAGE, def "PERCPU_CGROUP_STORAGE");
-          (`QUEUE, def "QUEUE");
-          (`STACK, def "STACK");
-          (`SK_STORAGE, def "SK_STORAGE");
-          (`DEVMAP_HASH, def "DEVMAP_HASH");
-          (`STRUCT_OPS, def "STRUCT_OPS");
-          (`RINGBUF, def "RINGBUF");
-          (`INODE_STORAGE, def "INODE_STORAGE");
-          (`TASK_STORAGE, def "TASK_STORAGE");
-          (`BLOOM_FILTER, def "BLOOM_FILTER");
-          (`USER_RINGBUF, def "USER_RINGBUF");
-        ]
+        (List.filter
+           (function `USER_RINGBUF, _, _ -> kver >= (6, 1, 0) | _ -> true)
+           [
+             (`UNSPEC, def, "UNSPEC");
+             (`HASH, def, "HASH");
+             (`ARRAY, def, "ARRAY");
+             (`PROG_ARRAY, def, "PROG_ARRAY");
+             (`PERF_EVENT_ARRAY, def, "PERF_EVENT_ARRAY");
+             (`PERCPU_HASH, def, "PERCPU_HASH");
+             (`PERCPU_ARRAY, def, "PERCPU_ARRAY");
+             (`STACK_TRACE, def, "STACK_TRACE");
+             (`CGROUP_ARRAY, def, "CGROUP_ARRAY");
+             (`LRU_HASH, def, "LRU_HASH");
+             (`LRU_PERCPU_HASH, def, "LRU_PERCPU_HASH");
+             (`LPM_TRIE, def, "LPM_TRIE");
+             (`ARRAY_OF_MAPS, def, "ARRAY_OF_MAPS");
+             (`HASH_OF_MAPS, def, "HASH_OF_MAPS");
+             (`DEVMAP, def, "DEVMAP");
+             (`SOCKMAP, def, "SOCKMAP");
+             (`CPUMAP, def, "CPUMAP");
+             (`XSKMAP, def, "XSKMAP");
+             (`SOCKHASH, def, "SOCKHASH");
+             (`CGROUP_STORAGE, def, "CGROUP_STORAGE");
+             (`REUSEPORT_SOCKARRAY, def, "REUSEPORT_SOCKARRAY");
+             (`PERCPU_CGROUP_STORAGE, def, "PERCPU_CGROUP_STORAGE");
+             (`QUEUE, def, "QUEUE");
+             (`STACK, def, "STACK");
+             (`SK_STORAGE, def, "SK_STORAGE");
+             (`DEVMAP_HASH, def, "DEVMAP_HASH");
+             (`STRUCT_OPS, def, "STRUCT_OPS");
+             (`RINGBUF, def, "RINGBUF");
+             (`INODE_STORAGE, def, "INODE_STORAGE");
+             (`TASK_STORAGE, def, "TASK_STORAGE");
+             (`BLOOM_FILTER, def, "BLOOM_FILTER");
+             (`USER_RINGBUF, def, "USER_RINGBUF");
+           ] |> List.map (fun (t, f, s) -> t, f s))
   end
 
   module Bpf_prog_type = struct

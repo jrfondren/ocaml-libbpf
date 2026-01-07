@@ -1,7 +1,7 @@
 (library
  (name c_type_description)
  (public_name libbpf.c_type_description)
- (libraries ctypes)
+ (libraries ctypes unix str)
  (modules c_type_description))
 
 (rule
